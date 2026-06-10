@@ -1,36 +1,97 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Asistencias
 
-## Getting Started
+Sistema de asistencias de empleados construido con Next.js, PWA (Serwist) y PostgreSQL (Prisma).
 
-First, run the development server:
+## Requisitos
+
+- Node.js 20+
+- Docker (opcional, para Postgres local)
+- npm
+
+## Setup local
+
+1. Clonar el repositorio e instalar dependencias:
+
+```bash
+npm install
+```
+
+2. Configurar variables de entorno:
+
+```bash
+cp .env.example .env.local
+```
+
+3. Levantar PostgreSQL local (opcional):
+
+```bash
+docker compose up -d
+```
+
+Alternativa: usar una URL de [Neon Postgres](https://neon.tech) en `DATABASE_URL`.
+
+4. Aplicar el schema y generar el cliente Prisma:
+
+```bash
+npm run db:generate
+npm run db:push
+```
+
+5. Iniciar el servidor de desarrollo:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+6. Verificar:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- App: [http://localhost:3000](http://localhost:3000)
+- Health check: [http://localhost:3000/api/health](http://localhost:3000/api/health)
+- Manifest: [http://localhost:3000/manifest.webmanifest](http://localhost:3000/manifest.webmanifest)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Scripts
 
-## Learn More
+| Script | Descripción |
+|--------|-------------|
+| `npm run dev` | Servidor de desarrollo |
+| `npm run build` | Build de producción (incluye service worker PWA) |
+| `npm run start` | Servidor de producción |
+| `npm run db:generate` | Genera el cliente Prisma |
+| `npm run db:push` | Sincroniza schema con la base de datos |
+| `npm run db:migrate` | Crea y aplica migraciones |
+| `npm run db:studio` | Abre Prisma Studio |
 
-To learn more about Next.js, take a look at the following resources:
+## PWA
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Serwist genera el service worker en build de producción. Para probar la PWA:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npm run build
+npm run start
+```
 
-## Deploy on Vercel
+Luego en Chrome DevTools → **Application** → **Manifest** / **Service Workers**.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Stack
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **Next.js 15** (App Router, TypeScript)
+- **Serwist** — PWA / service worker
+- **Prisma 7** + **PostgreSQL** (Neon en producción)
+- **date-fns** — utilidades de fechas semanales/mensuales
+- **shadcn/ui** — componentes UI
+
+## Etapas del proyecto
+
+- **Etapa 1** (actual): Setup del proyecto, PWA, DB y dependencias
+- **Etapa 2**: ABM de empleados/asistencias y lógica de negocio
+- **Etapa 3**: Deploy a Vercel + Neon via Marketplace
+
+### Deploy (etapa 3)
+
+```bash
+vercel link
+vercel integration add neon
+vercel env pull .env.local --yes
+npm run db:migrate
+vercel deploy
+```

@@ -1,65 +1,138 @@
-import Image from "next/image";
+import {
+  BarChart3,
+  CalendarCheck,
+  ChevronRight,
+  HardHat,
+  Wallet,
+} from "lucide-react";
+import Link from "next/link";
 
-export default function Home() {
+import {
+  addDaysIso,
+  formatIsoShort,
+  isoToDb,
+  todayIso,
+  weekStartIso,
+} from "@/lib/dates";
+import { prisma } from "@/lib/db";
+import { formatARS } from "@/lib/format";
+
+export const dynamic = "force-dynamic";
+
+const QUICK_LINKS = [
+  {
+    href: "/asistencias",
+    label: "Asistencias",
+    description: "Marcar presentes",
+    icon: CalendarCheck,
+    color: "bg-[#0071e3]/10 text-[#0071e3]",
+  },
+  {
+    href: "/pagos",
+    label: "Pagos",
+    description: "Liquidar semana",
+    icon: Wallet,
+    color: "bg-[#34c759]/10 text-[#248a3d]",
+  },
+  {
+    href: "/obras",
+    label: "Obras",
+    description: "Ver asignaciones",
+    icon: HardHat,
+    color: "bg-[#ff9500]/10 text-[#c93400]",
+  },
+  {
+    href: "/estadisticas",
+    label: "Estadísticas",
+    description: "Gastos y deudas",
+    icon: BarChart3,
+    color: "bg-[#5856d6]/10 text-[#5856d6]",
+  },
+];
+
+export default async function HomePage() {
+  const weekStart = weekStartIso(todayIso());
+  const weekEnd = addDaysIso(weekStart, 4);
+
+  const [shiftsThisWeek, paidThisWeek, debtTotal, activeEmployees] =
+    await Promise.all([
+      prisma.attendance.count({
+        where: {
+          present: true,
+          date: { gte: isoToDb(weekStart), lte: isoToDb(weekEnd) },
+        },
+      }),
+      prisma.payment.aggregate({
+        where: { weekStart: isoToDb(weekStart) },
+        _sum: { totalPaid: true },
+        _count: { _all: true },
+      }),
+      prisma.debtMovement.aggregate({ _sum: { amount: true } }),
+      prisma.employee.count({ where: { active: true } }),
+    ]);
+
+  const stats = [
+    { label: "Empleados", value: String(activeEmployees) },
+    { label: "Turnos", value: String(shiftsThisWeek) },
+    {
+      label: "Pagado",
+      value: formatARS(Number(paidThisWeek._sum.totalPaid ?? 0)),
+      sub: `${paidThisWeek._count._all} de ${activeEmployees}`,
+    },
+    {
+      label: "Deuda total de secretarios",
+      value: formatARS(Number(debtTotal._sum.amount ?? 0)),
+      accent: true,
+    },
+  ];
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+    <div className="space-y-8">
+      <p className="text-[20px] font-bold leading-tight tracking-tight text-foreground sm:text-[22px]">
+        Semana del {formatIsoShort(weekStart)} al {formatIsoShort(weekEnd)}
+      </p>
+
+      <div className="stat-grid">
+        {stats.map((stat) => (
+          <div key={stat.label} className="stat-card">
+            <p
+              className={`label-caption font-semibold ${stat.accent ? "text-destructive" : ""}`}
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+              {stat.label}
+            </p>
+            <p
+              className={`stat-value mt-1 ${stat.accent ? "!text-destructive" : ""}`}
             >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+              {stat.value}
+            </p>
+            {stat.sub && (
+              <p className="mt-1 text-[11px] text-muted-foreground">{stat.sub}</p>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <section>
+        <h2 className="mb-3 text-[13px] font-semibold uppercase tracking-wide text-muted-foreground">
+          Accesos rápidos
+        </h2>
+        <div className="ios-list">
+          {QUICK_LINKS.map(({ href, label, description, icon: Icon, color }) => (
+            <Link key={href} href={href} className="ios-list-row group">
+              <span
+                className={`flex size-9 shrink-0 items-center justify-center rounded-[10px] ${color}`}
+              >
+                <Icon className="size-[18px]" strokeWidth={2} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-[15px] font-medium text-foreground">{label}</p>
+                <p className="text-[13px] text-muted-foreground">{description}</p>
+              </div>
+              <ChevronRight className="size-4 text-muted-foreground/70 transition-transform group-active:translate-x-0.5" />
+            </Link>
+          ))}
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+      </section>
     </div>
   );
 }
