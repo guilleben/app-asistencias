@@ -25,9 +25,14 @@ type RecordItem = {
   shift: Shift;
   present: boolean;
   siteId: number | null;
+  recordedAt: string | null;
 };
 
-type CellState = { present: boolean; siteId: number | null };
+type CellState = {
+  present: boolean;
+  siteId: number | null;
+  recordedAt: string | null;
+};
 
 const SHIFTS: { value: Shift; label: string }[] = [
   { value: "MORNING", label: "Mañana" },
@@ -47,6 +52,16 @@ const SHIFT_MARK_ALL_LABEL: Record<
     none: "Quitar media tarde",
   },
 };
+
+function formatRecordedAt(iso: string): string {
+  return new Date(iso).toLocaleString("es-AR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
 function cellKey(employeeId: number, date: string, shift: Shift): string {
   return `${employeeId}|${date}|${shift}`;
@@ -79,6 +94,7 @@ export function AttendanceGrid({
       map.set(cellKey(r.employeeId, r.date, r.shift), {
         present: r.present,
         siteId: r.siteId,
+        recordedAt: r.recordedAt,
       });
     }
     return map;
@@ -90,6 +106,7 @@ export function AttendanceGrid({
       map.set(cellKey(r.employeeId, r.date, r.shift), {
         present: r.present,
         siteId: r.siteId,
+        recordedAt: r.recordedAt,
       });
     }
     setCells(map);
@@ -100,6 +117,7 @@ export function AttendanceGrid({
       cells.get(cellKey(employeeId, date, shift)) ?? {
         present: false,
         siteId: null,
+        recordedAt: null,
       }
     );
   }
@@ -119,7 +137,12 @@ export function AttendanceGrid({
 
   function togglePresent(employeeId: number, date: string, shift: Shift) {
     const current = getCell(employeeId, date, shift);
-    const next = { ...current, present: !current.present };
+    const nextPresent = !current.present;
+    const next = {
+      present: nextPresent,
+      siteId: current.siteId,
+      recordedAt: nextPresent ? new Date().toISOString() : null,
+    };
     updateCell(employeeId, date, shift, next);
 
     startTransition(async () => {
@@ -144,7 +167,11 @@ export function AttendanceGrid({
     siteId: number | null,
   ) {
     const current = getCell(employeeId, date, shift);
-    updateCell(employeeId, date, shift, { present: true, siteId });
+    updateCell(employeeId, date, shift, {
+      present: true,
+      siteId,
+      recordedAt: current.recordedAt ?? new Date().toISOString(),
+    });
 
     startTransition(async () => {
       const result = await setAttendanceSite({
@@ -181,6 +208,9 @@ export function AttendanceGrid({
           next.set(key, {
             present: nextPresent,
             siteId: current?.siteId ?? null,
+            recordedAt: nextPresent
+              ? (current?.recordedAt ?? new Date().toISOString())
+              : null,
           });
         }
       }
@@ -269,6 +299,11 @@ export function AttendanceGrid({
                         <p className="text-[13px] text-muted-foreground">
                           {employee.category}
                         </p>
+                        {cell.present && cell.recordedAt ? (
+                          <p className="text-[11px] text-muted-foreground/80">
+                            Registrado {formatRecordedAt(cell.recordedAt)}
+                          </p>
+                        ) : null}
                       </div>
                       {cell.present && (
                         <NativeSelect

@@ -56,6 +56,7 @@ export default async function AsistenciasPage({
           shift: a.shift,
           present: a.present,
           siteId: a.siteId,
+          recordedAt: a.present ? a.updatedAt.toISOString() : null,
         }))}
       />
     </div>

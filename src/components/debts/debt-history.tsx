@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatIsoShort } from "@/lib/dates";
 import {
   DEBT_MOVEMENT_LABELS,
+  formatBalanceAfterLabel,
   getDebtMovementKind,
   type DebtMovementKind,
 } from "@/lib/debts";
@@ -36,7 +37,8 @@ type FilterTab = (typeof FILTER_TABS)[number]["value"];
 
 function kindBadgeVariant(kind: DebtMovementKind) {
   if (kind === "loan") return "destructive" as const;
-  if (kind === "payment") return "success" as const;
+  if (kind === "credit_applied") return "success" as const;
+  if (kind === "payment" || kind === "manual_discount") return "success" as const;
   return "secondary" as const;
 }
 
@@ -58,7 +60,7 @@ function HistoryRow({ item }: { item: DebtHistoryItem }) {
             : "bg-success/10 text-[#248a3d]",
         )}
       >
-        {kind === "loan" ? "+" : "−"}
+        {kind === "loan" || kind === "credit_applied" ? "+" : "−"}
       </div>
       <div className="min-w-0 flex-1 space-y-1">
         <div className="flex flex-wrap items-center gap-2">
@@ -68,10 +70,12 @@ function HistoryRow({ item }: { item: DebtHistoryItem }) {
         <p
           className={cn(
             "text-[17px] font-semibold tabular-nums tracking-tight",
-            kind === "loan" ? "text-destructive" : "text-[#248a3d]",
+            kind === "loan" || kind === "credit_applied"
+              ? "text-destructive"
+              : "text-[#248a3d]",
           )}
         >
-          {kind === "loan" ? "+" : ""}
+          {kind === "loan" || kind === "credit_applied" ? "+" : ""}
           {formatARS(Math.abs(item.amount))}
         </p>
         <p className="text-[13px] text-muted-foreground">
@@ -81,9 +85,14 @@ function HistoryRow({ item }: { item: DebtHistoryItem }) {
             : ""}
           {item.note ? ` · ${item.note}` : ""}
         </p>
-        {item.balanceAfter > 0 ? (
-          <p className="text-[13px] font-semibold text-destructive">
-            Sigue debiendo {formatARS(item.balanceAfter)}
+        {formatBalanceAfterLabel(item.balanceAfter) ? (
+          <p
+            className={cn(
+              "text-[13px] font-semibold",
+              item.balanceAfter > 0 ? "text-destructive" : "text-[#248a3d]",
+            )}
+          >
+            {formatBalanceAfterLabel(item.balanceAfter)}
           </p>
         ) : null}
       </div>

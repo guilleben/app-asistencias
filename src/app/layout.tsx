@@ -44,7 +44,7 @@ export default function RootLayout({
         {process.env.NODE_ENV === "development" ? (
           <script
             dangerouslySetInnerHTML={{
-              __html: `(function(){if("serviceWorker"in navigator){navigator.serviceWorker.getRegistrations().then(function(r){r.forEach(function(x){x.unregister()})})}if("caches"in window){caches.keys().then(function(k){k.forEach(function(n){if(n.includes("serwist")||n.includes("precache"))caches.delete(n)})})}})();`,
+              __html: `(function(){if("serviceWorker"in navigator){navigator.serviceWorker.getRegistrations().then(function(r){r.forEach(function(x){x.unregister()})})}if("caches"in window){caches.keys().then(function(k){k.forEach(function(n){caches.delete(n)})})}})();`,
             }}
           />
         ) : null}

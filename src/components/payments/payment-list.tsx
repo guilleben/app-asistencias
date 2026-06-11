@@ -15,8 +15,19 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cancelPayment, confirmPayment } from "@/lib/actions/payments";
+import { formatEmployeeBalance } from "@/lib/debts";
 import { formatARS } from "@/lib/format";
 import type { EmployeePayroll } from "@/lib/payroll";
+
+function formatPaymentDate(iso: string): string {
+  return new Date(iso).toLocaleString("es-AR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
 function Row({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
   return (
@@ -41,12 +52,14 @@ function PaymentCard({
   const [pending, startTransition] = useTransition();
 
   const paid = data.payment;
+  const creditAvailable = data.debtBalance < 0 ? -data.debtBalance : 0;
+  const maxDeduction = Math.max(data.debtBalance, 0);
   const safeDeduction = Math.min(
     Math.max(deduction, 0),
-    data.debtBalance,
+    maxDeduction,
     data.suggestedTotal,
   );
-  const total = data.suggestedTotal - safeDeduction;
+  const total = data.suggestedTotal - safeDeduction + creditAvailable;
 
   function handleConfirm() {
     startTransition(async () => {
@@ -94,6 +107,9 @@ function PaymentCard({
       <CardContent className="space-y-1.5 text-sm">
         {paid ? (
           <>
+            <p className="text-[11px] text-muted-foreground">
+              Pagado el {formatPaymentDate(paid.paidAt)}
+            </p>
             <Row label={`Base`} value={formatARS(paid.baseAmount)} />
             {paid.retroAmount > 0 && (
               <Row label="Retroactivo" value={formatARS(paid.retroAmount)} />
@@ -127,15 +143,26 @@ function PaymentCard({
             <Row label="Subtotal" value={formatARS(data.suggestedTotal)} />
 
             <div className="flex items-center justify-between pt-1">
-              <span className="text-muted-foreground">Deuda actual</span>
+              <span className="text-muted-foreground">Saldo de deuda</span>
               <span
                 className={
-                  data.debtBalance > 0 ? "font-medium text-destructive" : ""
+                  data.debtBalance > 0
+                    ? "font-medium text-destructive"
+                    : data.debtBalance < 0
+                      ? "font-medium text-[#248a3d]"
+                      : ""
                 }
               >
-                {formatARS(data.debtBalance)}
+                {formatEmployeeBalance(data.debtBalance).text}
               </span>
             </div>
+
+            {creditAvailable > 0 && (
+              <Row
+                label="Saldo a favor aplicado"
+                value={`+ ${formatARS(creditAvailable)}`}
+              />
+            )}
 
             {data.debtBalance > 0 && (
               <div className="space-y-1 pt-2">
@@ -148,7 +175,7 @@ function PaymentCard({
                     type="number"
                     inputMode="numeric"
                     min={0}
-                    max={Math.min(data.debtBalance, data.suggestedTotal)}
+                    max={Math.min(maxDeduction, data.suggestedTotal)}
                     value={deduction === 0 ? "" : deduction}
                     placeholder="0"
                     onChange={(e) => setDeduction(Number(e.target.value) || 0)}
@@ -159,7 +186,7 @@ function PaymentCard({
                     size="sm"
                     onClick={() =>
                       setDeduction(
-                        Math.min(data.debtBalance, data.suggestedTotal),
+                        Math.min(maxDeduction, data.suggestedTotal),
                       )
                     }
                   >

@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/page-header";
+import { formatEmployeeBalance } from "@/lib/debts";
 import { prisma } from "@/lib/db";
 import { formatARS } from "@/lib/format";
 
@@ -31,6 +32,7 @@ export default async function EmpleadosPage() {
       <div className="ios-list">
         {employees.map((employee) => {
           const debt = debtByEmployee.get(employee.id) ?? 0;
+          const balance = formatEmployeeBalance(debt);
           const weeklyEstimate = Number(employee.category.dailyRate) * 5;
 
           return (
@@ -49,10 +51,12 @@ export default async function EmpleadosPage() {
                   {formatARS(weeklyEstimate)}/sem
                 </p>
               </div>
-              {debt > 0 ? (
-                <Badge variant="destructive">{formatARS(debt)}</Badge>
+              {balance.tone === "debt" ? (
+                <Badge variant="destructive">{balance.text}</Badge>
+              ) : balance.tone === "credit" ? (
+                <Badge variant="success">{balance.text}</Badge>
               ) : (
-                <Badge variant="success">Al día</Badge>
+                <Badge variant="success">{balance.text}</Badge>
               )}
             </div>
           );

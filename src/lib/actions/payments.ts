@@ -36,11 +36,15 @@ export async function confirmPayment(
     if (!data) return fail("Empleado no encontrado");
 
     const debtBalance = await getDebtBalance(employeeId);
-    if (debtDeduction > debtBalance) {
+    const maxDeduction = Math.max(debtBalance, 0);
+    const creditAvailable = debtBalance < 0 ? -debtBalance : 0;
+
+    if (debtDeduction > maxDeduction) {
       return fail("La deducción supera la deuda actual");
     }
 
-    const totalPaid = data.suggestedTotal - debtDeduction;
+    const totalPaid =
+      data.suggestedTotal - debtDeduction + creditAvailable;
     if (totalPaid < 0) return fail("El total a pagar no puede ser negativo");
 
     await prisma.$transaction(async (tx) => {
@@ -63,6 +67,17 @@ export async function confirmPayment(
             employeeId,
             amount: -debtDeduction,
             note: `Descuento en pago semanal (${weekStart})`,
+            paymentId: payment.id,
+          },
+        });
+      }
+
+      if (creditAvailable > 0) {
+        await tx.debtMovement.create({
+          data: {
+            employeeId,
+            amount: creditAvailable,
+            note: `Saldo a favor aplicado en pago (${weekStart})`,
             paymentId: payment.id,
           },
         });
