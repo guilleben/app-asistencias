@@ -145,3 +145,31 @@ model Payment {
   @@unique([employeeId, weekStart])
   @@index([weekStart])
 }
+
+model Budget {
+  id           Int      @id @default(autoincrement())
+  owner        String
+  workName     String
+  location     String
+  date         DateTime @db.Date
+  totalAmount  Decimal  @db.Decimal(12, 2)
+  observations String?  @db.Text
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  items BudgetItem[]
+
+  @@index([date])
+}
+
+model BudgetItem {
+  id          Int    @id @default(autoincrement())
+  budgetId    Int
+  description String
+  sortOrder   Int    @default(0)
+
+  budget Budget @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+
+  @@index([budgetId])
+}

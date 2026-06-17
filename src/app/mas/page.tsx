@@ -1,6 +1,7 @@
 import {
   Banknote,
   ChevronRight,
+  FileText,
   Gift,
   HardHat,
   History,
@@ -53,6 +54,13 @@ const LINKS = [
     description: "Precios UOCRA por día",
     icon: Tags,
     color: "bg-[#86868b]/15 text-[#515154]",
+  },
+  {
+    href: "/presupuestos",
+    label: "Presupuestos",
+    description: "Crear y descargar PDF",
+    icon: FileText,
+    color: "bg-[#0071e3]/10 text-[#0071e3]",
   },
 ];
 
