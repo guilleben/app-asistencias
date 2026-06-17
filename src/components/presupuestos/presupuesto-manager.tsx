@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, Minus, Pencil, Plus, Trash2 } from "lucide-react";
+import { Download, Loader2, Minus, Pencil, Plus, Trash2 } from "lucide-react";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
@@ -21,6 +21,7 @@ import {
   updateBudget,
   type BudgetInput,
 } from "@/lib/actions/presupuestos";
+import { downloadOrShareBudgetPdf } from "@/lib/download-budget-pdf";
 import { formatIsoLong, todayIso } from "@/lib/dates";
 import { formatARS } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -311,6 +312,30 @@ function BudgetFormDialog({
 
 function PresupuestoCard({ presupuesto }: { presupuesto: PresupuestoItem }) {
   const [pending, startTransition] = useTransition();
+  const [downloading, setDownloading] = useState(false);
+
+  async function handleDownloadPdf() {
+    setDownloading(true);
+    try {
+      const result = await downloadOrShareBudgetPdf({
+        id: presupuesto.id,
+        date: presupuesto.date,
+        owner: presupuesto.owner,
+        workName: presupuesto.workName,
+      });
+
+      if (!result.ok) {
+        toast.error(result.message);
+        return;
+      }
+
+      if (result.method === "open") {
+        toast.info("Usá Compartir del visor para guardar o enviar el PDF");
+      }
+    } finally {
+      setDownloading(false);
+    }
+  }
 
   function handleDelete() {
     if (!confirm("¿Eliminar este presupuesto?")) return;
@@ -342,17 +367,14 @@ function PresupuestoCard({ presupuesto }: { presupuesto: PresupuestoItem }) {
             variant="ghost"
             size="icon-sm"
             aria-label="Descargar PDF"
-            nativeButton={false}
-            render={
-              <a
-                href={`/api/presupuestos/${presupuesto.id}/pdf`}
-                download
-                target="_blank"
-                rel="noopener noreferrer"
-              />
-            }
+            disabled={downloading || pending}
+            onClick={handleDownloadPdf}
           >
-            <Download />
+            {downloading ? (
+              <Loader2 className="animate-spin" />
+            ) : (
+              <Download />
+            )}
           </Button>
           <BudgetFormDialog
             presupuesto={presupuesto}
