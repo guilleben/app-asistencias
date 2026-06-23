@@ -14,10 +14,9 @@ import {
 } from "@/lib/pdf/footer-icons";
 import { getBenasulinLogoPath } from "@/lib/pdf/register-fonts";
 import {
-  formatBudgetAmountForPdf,
-  formatBudgetDateForPdf,
-  type BudgetPdfData,
-} from "@/lib/presupuestos";
+  formatMaterialListDateForPdf,
+  type MaterialListPdfData,
+} from "@/lib/listado-materiales";
 
 const GOLD = "#C5A059";
 const BLACK = "#000000";
@@ -100,40 +99,47 @@ const styles = StyleSheet.create({
     fontFamily: "OpenSans",
     fontWeight: 400,
   },
-  itemsRow: {
-    flexDirection: "row",
-    gap: 20,
-    marginTop: 14,
-    marginBottom: 18,
-  },
-  itemsColumn: {
-    flex: 1,
-  },
-  itemLine: {
-    fontFamily: "OpenSans",
-    fontWeight: 400,
-    fontSize: 9,
-    lineHeight: 1.5,
-    marginBottom: 6,
-  },
-  totalLine: {
+  sectionTitle: {
     fontFamily: "OpenSans",
     fontWeight: 700,
     fontSize: 11,
-    textAlign: "center",
-    marginTop: 6,
-    marginBottom: 14,
+    marginTop: 14,
+    marginBottom: 8,
   },
-  observations: {
+  tableHeader: {
+    flexDirection: "row",
+    borderBottomWidth: 1,
+    borderBottomColor: BLACK,
+    paddingBottom: 4,
+    marginBottom: 4,
+  },
+  tableRow: {
+    flexDirection: "row",
+    marginBottom: 5,
+  },
+  colItem: {
+    width: "8%",
     fontFamily: "OpenSans",
     fontWeight: 400,
     fontSize: 9,
-    lineHeight: 1.4,
-    marginBottom: 8,
   },
-  observationsLabel: {
+  colDescription: {
+    width: "62%",
+    fontFamily: "OpenSans",
+    fontWeight: 400,
+    fontSize: 9,
+    paddingRight: 8,
+  },
+  colQuantity: {
+    width: "30%",
+    fontFamily: "OpenSans",
+    fontWeight: 400,
+    fontSize: 9,
+  },
+  colHeader: {
     fontFamily: "OpenSans",
     fontWeight: 700,
+    fontSize: 9,
   },
   footer: {
     position: "absolute",
@@ -167,25 +173,11 @@ const styles = StyleSheet.create({
   },
 });
 
-function splitItems(items: { description: string }[]) {
-  if (items.length <= 3) {
-    return { left: items, right: [] as { description: string }[] };
-  }
-
-  const mid = Math.ceil(items.length / 2);
-  return {
-    left: items.slice(0, mid),
-    right: items.slice(mid),
-  };
-}
-
-function ItemLine({ description }: { description: string }) {
-  return <Text style={styles.itemLine}>• {description}</Text>;
-}
-
-export function PresupuestoDocument({ budget }: { budget: BudgetPdfData }) {
-  const amountLabel = formatBudgetAmountForPdf(budget.totalAmount);
-  const { left, right } = splitItems(budget.items);
+export function ListadoMaterialesDocument({
+  list,
+}: {
+  list: MaterialListPdfData;
+}) {
   const logoPath = getBenasulinLogoPath();
 
   return (
@@ -208,55 +200,45 @@ export function PresupuestoDocument({ budget }: { budget: BudgetPdfData }) {
         </View>
 
         <View style={styles.goldBar}>
-          <Text style={styles.goldBarText}>
-            MANO DE OBRA DE INSTALACIÓN ELÉCTRICA
-          </Text>
+          <Text style={styles.goldBarText}>LISTADO DE MATERIALES</Text>
         </View>
 
         <View style={styles.fieldRow}>
           <Text style={styles.fieldLabel}>Propietario: </Text>
-          <Text style={styles.fieldValue}>{budget.owner}</Text>
+          <Text style={styles.fieldValue}>{list.owner}</Text>
         </View>
         <View style={styles.fieldRow}>
           <Text style={styles.fieldLabel}>Obra: </Text>
-          <Text style={styles.fieldValue}>{budget.workName}</Text>
+          <Text style={styles.fieldValue}>{list.workName}</Text>
         </View>
         <View style={styles.fieldRow}>
           <Text style={styles.fieldLabel}>Ubicación: </Text>
-          <Text style={styles.fieldValue}>{budget.location}</Text>
+          <Text style={styles.fieldValue}>{list.location}</Text>
         </View>
         <View style={styles.fieldRow}>
           <Text style={styles.fieldLabel}>Fecha: </Text>
           <Text style={styles.fieldValue}>
-            {formatBudgetDateForPdf(budget.date)}
+            {formatMaterialListDateForPdf(list.date)}
           </Text>
         </View>
 
-        <View style={styles.itemsRow}>
-          <View style={styles.itemsColumn}>
-            {left.map((item, index) => (
-              <ItemLine key={`l-${index}`} description={item.description} />
-            ))}
+        <Text style={styles.sectionTitle}>Lista de Materiales</Text>
+
+        <View style={styles.tableHeader}>
+          <Text style={[styles.colItem, styles.colHeader]}>Ítem</Text>
+          <Text style={[styles.colDescription, styles.colHeader]}>
+            Descripción
+          </Text>
+          <Text style={[styles.colQuantity, styles.colHeader]}>Cantidad</Text>
+        </View>
+
+        {list.items.map((item, index) => (
+          <View key={index} style={styles.tableRow}>
+            <Text style={styles.colItem}>{index + 1}</Text>
+            <Text style={styles.colDescription}>{item.description}</Text>
+            <Text style={styles.colQuantity}>{item.quantity}</Text>
           </View>
-          {right.length > 0 ? (
-            <View style={styles.itemsColumn}>
-              {right.map((item, index) => (
-                <ItemLine key={`r-${index}`} description={item.description} />
-              ))}
-            </View>
-          ) : null}
-        </View>
-
-        <Text style={styles.totalLine}>
-          El monto total del presente presupuesto es de {amountLabel}.
-        </Text>
-
-        {budget.observations ? (
-          <Text style={styles.observations}>
-            <Text style={styles.observationsLabel}>OBSERVACIONES: </Text>
-            {budget.observations}
-          </Text>
-        ) : null}
+        ))}
 
         <View style={styles.footer} fixed>
           <View style={styles.footerRow}>

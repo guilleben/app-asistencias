@@ -1,6 +1,7 @@
 import {
   Banknote,
   ChevronRight,
+  ClipboardList,
   FileText,
   Gift,
   HardHat,
@@ -61,6 +62,13 @@ const LINKS = [
     description: "Crear y descargar PDF",
     icon: FileText,
     color: "bg-[#0071e3]/10 text-[#0071e3]",
+  },
+  {
+    href: "/listado-materiales",
+    label: "Listado de materiales",
+    description: "Crear y descargar PDF",
+    icon: ClipboardList,
+    color: "bg-[#5856d6]/10 text-[#5856d6]",
   },
 ];
 
