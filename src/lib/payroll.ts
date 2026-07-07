@@ -1,3 +1,7 @@
+import {
+  loadCategoryRatesMap,
+  resolveCategoryRateAt,
+} from "@/lib/category-rates";
 import { prisma } from "@/lib/db";
 import {
   addDaysIso,
@@ -34,7 +38,7 @@ export type EmployeePayroll = {
 
 /**
  * Calcula la nómina de la semana para todos los empleados activos.
- * - base: turnos presentes × (precio día / 2)
+ * - base: suma por turno presente usando el precio vigente en la fecha del turno
  * - retro: semanal → cada semana del mes; mensual → total en el último lunes del mes
  * - aguinaldo: cuota si la semana cae dentro de las N cuotas desde startDate
  */
@@ -54,13 +58,13 @@ export async function getWeekPayroll(
         include: { category: true },
         orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
       }),
-      prisma.attendance.groupBy({
-        by: ["employeeId"],
+      prisma.attendance.findMany({
         where: {
           present: true,
           date: { gte: isoToDb(weekStart), lte: isoToDb(weekEnd) },
+          employee: { active: true },
         },
-        _count: { _all: true },
+        select: { employeeId: true, date: true },
       }),
       prisma.retroactive.findMany({
         where: { active: true, year, month },
@@ -73,9 +77,38 @@ export async function getWeekPayroll(
       prisma.payment.findMany({ where: { weekStart: isoToDb(weekStart) } }),
     ]);
 
-  const shiftsByEmployee = new Map(
-    attendances.map((a) => [a.employeeId, a._count._all]),
-  );
+  const categoryIds = [...new Set(employees.map((e) => e.categoryId))];
+  const ratesMap = await loadCategoryRatesMap(categoryIds);
+
+  const baseByEmployee = new Map<number, number>();
+  const shiftsByEmployee = new Map<number, number>();
+
+  for (const attendance of attendances) {
+    const employee = employees.find((e) => e.id === attendance.employeeId);
+    if (!employee) continue;
+
+    const dateIso = dbToIso(attendance.date);
+    const fallback = {
+      dailyRate: Number(employee.category.dailyRate),
+      retroWeekly: Number(employee.category.retroWeekly),
+    };
+    const rate = resolveCategoryRateAt(
+      ratesMap,
+      employee.categoryId,
+      dateIso,
+      fallback,
+    );
+
+    shiftsByEmployee.set(
+      attendance.employeeId,
+      (shiftsByEmployee.get(attendance.employeeId) ?? 0) + 1,
+    );
+    baseByEmployee.set(
+      attendance.employeeId,
+      (baseByEmployee.get(attendance.employeeId) ?? 0) + rate.dailyRate / 2,
+    );
+  }
+
   const retroByEmployee = new Map(retroactives.map((r) => [r.employeeId, r]));
   const debtByEmployee = new Map(
     debtSums.map((d) => [d.employeeId, Number(d._sum.amount ?? 0)]),
@@ -91,8 +124,17 @@ export async function getWeekPayroll(
 
   return employees.map((employee) => {
     const shiftsPresent = shiftsByEmployee.get(employee.id) ?? 0;
-    const dailyRate = Number(employee.category.dailyRate);
-    const baseAmount = shiftsPresent * (dailyRate / 2);
+    const baseAmount = baseByEmployee.get(employee.id) ?? 0;
+    const fallback = {
+      dailyRate: Number(employee.category.dailyRate),
+      retroWeekly: Number(employee.category.retroWeekly),
+    };
+    const weekRate = resolveCategoryRateAt(
+      ratesMap,
+      employee.categoryId,
+      weekStart,
+      fallback,
+    );
 
     let retroAmount = 0;
     const retro = retroByEmployee.get(employee.id);
@@ -120,7 +162,7 @@ export async function getWeekPayroll(
       employeeId: employee.id,
       fullName: `${employee.firstName} ${employee.lastName}`,
       categoryName: employee.category.name,
-      dailyRate,
+      dailyRate: weekRate.dailyRate,
       shiftsPresent,
       baseAmount,
       retroAmount,

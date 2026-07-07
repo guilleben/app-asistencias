@@ -28,10 +28,26 @@ const SITES = ["Obra Centro", "Obra Norte", "Obra Sur"];
 
 async function main() {
   for (const cat of CATEGORIES) {
-    await prisma.category.upsert({
+    const category = await prisma.category.upsert({
       where: { name: cat.name },
       update: {},
       create: cat,
+    });
+
+    await prisma.categoryRate.upsert({
+      where: {
+        categoryId_effectiveFrom: {
+          categoryId: category.id,
+          effectiveFrom: new Date("2020-01-01"),
+        },
+      },
+      update: {},
+      create: {
+        categoryId: category.id,
+        dailyRate: cat.dailyRate,
+        retroWeekly: cat.retroWeekly,
+        effectiveFrom: new Date("2020-01-01"),
+      },
     });
   }
   console.log(`Categorías: ${CATEGORIES.length}`);

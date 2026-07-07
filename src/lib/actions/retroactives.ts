@@ -4,6 +4,11 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { fail, ok, type ActionResult } from "@/lib/actions/result";
+import {
+  loadCategoryRatesMap,
+  monthStartIso,
+  resolveCategoryRateAt,
+} from "@/lib/category-rates";
 import { prisma } from "@/lib/db";
 
 const upsertSchema = z.object({
@@ -14,6 +19,23 @@ const upsertSchema = z.object({
   weeklyAmount: z.number().min(0).optional(),
   active: z.boolean(),
 });
+
+async function defaultRetroWeekly(
+  categoryId: number,
+  year: number,
+  month: number,
+  fallbackRetroWeekly: number,
+): Promise<number> {
+  const ratesMap = await loadCategoryRatesMap([categoryId]);
+  const monthStart = monthStartIso(year, month);
+  const resolved = resolveCategoryRateAt(
+    ratesMap,
+    categoryId,
+    monthStart,
+    { dailyRate: 0, retroWeekly: fallbackRetroWeekly },
+  );
+  return resolved.retroWeekly;
+}
 
 export async function upsertRetroactive(
   input: z.infer<typeof upsertSchema>,
@@ -32,7 +54,12 @@ export async function upsertRetroactive(
         include: { category: true },
       });
       if (!employee) return fail("Empleado no encontrado");
-      amount = Number(employee.category.retroWeekly);
+      amount = await defaultRetroWeekly(
+        employee.categoryId,
+        year,
+        month,
+        Number(employee.category.retroWeekly),
+      );
     }
 
     await prisma.retroactive.upsert({
@@ -75,9 +102,24 @@ export async function activateRetroForAll(
       include: { category: true },
     });
 
+    const categoryIds = [...new Set(employees.map((e) => e.categoryId))];
+    const ratesMap = await loadCategoryRatesMap(categoryIds);
+    const monthStart = monthStartIso(year, month);
+
     await prisma.$transaction(
-      employees.map((employee) =>
-        prisma.retroactive.upsert({
+      employees.map((employee) => {
+        const fallback = {
+          dailyRate: Number(employee.category.dailyRate),
+          retroWeekly: Number(employee.category.retroWeekly),
+        };
+        const resolved = resolveCategoryRateAt(
+          ratesMap,
+          employee.categoryId,
+          monthStart,
+          fallback,
+        );
+
+        return prisma.retroactive.upsert({
           where: {
             employeeId_month_year: { employeeId: employee.id, month, year },
           },
@@ -87,11 +129,11 @@ export async function activateRetroForAll(
             month,
             year,
             frequency,
-            weeklyAmount: Number(employee.category.retroWeekly),
+            weeklyAmount: resolved.retroWeekly,
             active: true,
           },
-        }),
-      ),
+        });
+      }),
     );
 
     revalidatePath("/", "layout");

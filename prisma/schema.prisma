@@ -26,6 +26,21 @@ model Category {
   updatedAt   DateTime @updatedAt
 
   employees Employee[]
+  rates     CategoryRate[]
+}
+
+model CategoryRate {
+  id            Int      @id @default(autoincrement())
+  categoryId    Int
+  dailyRate     Decimal  @db.Decimal(12, 2)
+  retroWeekly   Decimal  @db.Decimal(12, 2)
+  effectiveFrom DateTime @db.Date
+  createdAt     DateTime @default(now())
+
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([categoryId, effectiveFrom])
+  @@index([categoryId, effectiveFrom])
 }
 
 model Employee {

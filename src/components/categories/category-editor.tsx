@@ -16,7 +16,19 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { updateCategory } from "@/lib/actions/categories";
-import { formatARS } from "@/lib/format";
+import { formatIsoLong } from "@/lib/dates";
+import {
+  formatARS,
+  formatAmountInputFromDigits,
+  formatAmountInputFromNumber,
+  parseAmountInput,
+} from "@/lib/format";
+
+type RateHistoryItem = {
+  effectiveFrom: string;
+  dailyRate: number;
+  retroWeekly: number;
+};
 
 type CategoryItem = {
   id: number;
@@ -24,18 +36,31 @@ type CategoryItem = {
   dailyRate: number;
   retroWeekly: number;
   employeeCount: number;
+  recentRates: RateHistoryItem[];
 };
 
 export function CategoryEditor({ category }: { category: CategoryItem }) {
   const [open, setOpen] = useState(false);
-  const [dailyRate, setDailyRate] = useState(String(category.dailyRate));
-  const [retroWeekly, setRetroWeekly] = useState(String(category.retroWeekly));
+  const [dailyRate, setDailyRate] = useState(
+    formatAmountInputFromNumber(category.dailyRate),
+  );
+  const [retroWeekly, setRetroWeekly] = useState(
+    formatAmountInputFromNumber(category.retroWeekly),
+  );
   const [pending, startTransition] = useTransition();
 
+  function handleOpenChange(next: boolean) {
+    setOpen(next);
+    if (next) {
+      setDailyRate(formatAmountInputFromNumber(category.dailyRate));
+      setRetroWeekly(formatAmountInputFromNumber(category.retroWeekly));
+    }
+  }
+
   function handleSave() {
-    const daily = Number(dailyRate);
-    const retro = Number(retroWeekly);
-    if (!daily || daily <= 0 || retro < 0) {
+    const daily = parseAmountInput(dailyRate);
+    const retro = parseAmountInput(retroWeekly);
+    if (daily === null || daily <= 0 || retro === null || retro < 0) {
       toast.error("Montos inválidos");
       return;
     }
@@ -66,7 +91,7 @@ export function CategoryEditor({ category }: { category: CategoryItem }) {
         </p>
       </div>
 
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogTrigger render={<Button variant="outline" size="icon-sm" />}>
           <Pencil />
         </DialogTrigger>
@@ -75,14 +100,21 @@ export function CategoryEditor({ category }: { category: CategoryItem }) {
             <DialogTitle>Editar {category.name}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              El nuevo precio aplica desde hoy; los días anteriores mantienen el
+              valor vigente.
+            </p>
             <div className="space-y-1">
               <Label htmlFor={`daily-${category.id}`}>Precio por día</Label>
               <Input
                 id={`daily-${category.id}`}
-                type="number"
-                inputMode="numeric"
+                type="text"
+                inputMode="decimal"
+                placeholder="0,00"
                 value={dailyRate}
-                onChange={(e) => setDailyRate(e.target.value)}
+                onChange={(e) =>
+                  setDailyRate(formatAmountInputFromDigits(e.target.value))
+                }
               />
             </div>
             <div className="space-y-1">
@@ -91,12 +123,29 @@ export function CategoryEditor({ category }: { category: CategoryItem }) {
               </Label>
               <Input
                 id={`retro-${category.id}`}
-                type="number"
-                inputMode="numeric"
+                type="text"
+                inputMode="decimal"
+                placeholder="0,00"
                 value={retroWeekly}
-                onChange={(e) => setRetroWeekly(e.target.value)}
+                onChange={(e) =>
+                  setRetroWeekly(formatAmountInputFromDigits(e.target.value))
+                }
               />
             </div>
+            {category.recentRates.length > 0 ? (
+              <div className="space-y-1">
+                <Label>Historial reciente</Label>
+                <ul className="max-h-32 space-y-1 overflow-y-auto text-xs text-muted-foreground">
+                  {category.recentRates.map((rate) => (
+                    <li key={rate.effectiveFrom}>
+                      {formatIsoLong(rate.effectiveFrom)}:{" "}
+                      {formatARS(rate.dailyRate)}/día ·{" "}
+                      {formatARS(rate.retroWeekly)}/sem
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
           </div>
           <DialogFooter>
             <Button disabled={pending} onClick={handleSave}>
