@@ -1,6 +1,7 @@
 "use client";
 
-import { Archive, ArchiveRestore, Pencil, Plus, Trash2 } from "lucide-react";
+import Link from "next/link";
+import { Archive, ArchiveRestore, Pencil, Plus, Trash2, Wrench } from "lucide-react";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
@@ -27,6 +28,8 @@ type SiteItem = {
   id: number;
   name: string;
   active: boolean;
+  toolKinds: number;
+  toolUnits: number;
   weekEmployees: { name: string; shifts: number }[];
 };
 
@@ -106,6 +109,16 @@ function SiteCard({ site }: { site: SiteItem }) {
           {!site.active && <Badge variant="outline">Archivada</Badge>}
         </div>
         <div className="flex gap-1">
+          {site.active ? (
+            <Button
+              render={<Link href={`/herramientas?site=${site.id}`} />}
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Ver herramientas"
+            >
+              <Wrench />
+            </Button>
+          ) : null}
           <Dialog open={editOpen} onOpenChange={setEditOpen}>
             <DialogTrigger render={<Button variant="ghost" size="icon-sm" />}>
               <Pencil />
@@ -149,6 +162,15 @@ function SiteCard({ site }: { site: SiteItem }) {
           </Button>
         </div>
       </div>
+
+      {site.active ? (
+        <p className="mt-2 text-xs text-muted-foreground">
+          Herramientas:{" "}
+          {site.toolKinds === 0
+            ? "ninguna"
+            : `${site.toolKinds} tipos · ${site.toolUnits} u.`}
+        </p>
+      ) : null}
 
       {site.weekEmployees.length > 0 && (
         <div className="mt-2 space-y-1 border-t pt-2">

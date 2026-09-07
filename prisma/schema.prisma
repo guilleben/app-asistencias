@@ -62,6 +62,21 @@ model Employee {
   @@index([categoryId])
 }
 
+enum ToolStatus {
+  OK
+  IN_REPAIR
+  LOST
+}
+
+enum ToolMovementKind {
+  CREATED
+  UPDATED
+  DELETED
+  TRANSFER_OUT
+  TRANSFER_IN
+  STATUS_CHANGED
+}
+
 model Site {
   id        Int      @id @default(autoincrement())
   name      String   @unique
@@ -70,6 +85,48 @@ model Site {
   updatedAt DateTime @updatedAt
 
   attendances Attendance[]
+  siteTools   SiteTool[]
+  toolMoves   SiteToolMovement[]
+}
+
+model SiteTool {
+  id        Int        @id @default(autoincrement())
+  siteId    Int
+  name      String
+  quantity  Int        @default(1)
+  status    ToolStatus @default(OK)
+  note      String?
+  active    Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  site      Site                 @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  movements SiteToolMovement[]
+
+  @@unique([siteId, name])
+  @@index([siteId])
+}
+
+model SiteToolMovement {
+  id            Int              @id @default(autoincrement())
+  siteToolId    Int?
+  siteId        Int
+  toolName      String
+  kind          ToolMovementKind
+  quantity      Int
+  quantityAfter Int?
+  status        ToolStatus?
+  fromSiteId    Int?
+  toSiteId      Int?
+  note          String?
+  createdAt     DateTime         @default(now())
+
+  siteTool SiteTool? @relation(fields: [siteToolId], references: [id], onDelete: SetNull)
+  site     Site      @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@index([siteId])
+  @@index([createdAt])
+  @@index([toolName])
 }
 
 model Attendance {

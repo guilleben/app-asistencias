@@ -1,6 +1,7 @@
 import { AttendanceGrid } from "@/components/attendance/attendance-grid";
 import { PageHeader } from "@/components/page-header";
 import { WeekNav } from "@/components/week-nav";
+import { getWeekSiteDefaults } from "@/lib/attendance";
 import {
   addDaysIso,
   dbToIso,
@@ -35,6 +36,13 @@ export default async function AsistenciasPage({
     }),
   ]);
 
+  const employeeIds = employees.map((e) => e.id);
+  const siteDefaults = await getWeekSiteDefaults(
+    employeeIds,
+    weekStart,
+    attendances,
+  );
+
   return (
     <div>
       <PageHeader title="Asistencias" description="Tocá para marcar presente/ausente">
@@ -58,6 +66,7 @@ export default async function AsistenciasPage({
           siteId: a.siteId,
           recordedAt: a.present ? a.updatedAt.toISOString() : null,
         }))}
+        siteDefaults={Object.fromEntries(siteDefaults)}
       />
     </div>
   );

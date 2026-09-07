@@ -58,9 +58,15 @@ export async function deleteSite(id: number): Promise<ActionResult> {
   if (!Number.isInteger(id) || id <= 0) return fail("Obra inválida");
 
   try {
-    const usage = await prisma.attendance.count({ where: { siteId: id } });
-    if (usage > 0) {
+    const [attendanceUsage, toolUsage] = await Promise.all([
+      prisma.attendance.count({ where: { siteId: id } }),
+      prisma.siteTool.count({ where: { siteId: id } }),
+    ]);
+    if (attendanceUsage > 0) {
       return fail("La obra tiene asistencias asociadas; archivala en su lugar");
+    }
+    if (toolUsage > 0) {
+      return fail("La obra tiene herramientas cargadas; archivala en su lugar");
     }
 
     await prisma.site.delete({ where: { id } });

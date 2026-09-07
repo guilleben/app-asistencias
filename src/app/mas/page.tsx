@@ -8,6 +8,7 @@ import {
   History,
   Tags,
   Users,
+  Wrench,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -48,6 +49,13 @@ const LINKS = [
     description: "ABM y semana por obra",
     icon: HardHat,
     color: "bg-[#34c759]/10 text-[#248a3d]",
+  },
+  {
+    href: "/herramientas",
+    label: "Herramientas",
+    description: "Inventario por obra",
+    icon: Wrench,
+    color: "bg-[#ff9500]/10 text-[#c93400]",
   },
   {
     href: "/categorias",

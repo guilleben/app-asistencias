@@ -15,7 +15,7 @@ export default async function ObrasPage() {
   const weekStart = weekStartIso(todayIso());
   const weekEnd = addDaysIso(weekStart, 4);
 
-  const [sites, weekAttendances] = await Promise.all([
+  const [sites, weekAttendances, toolStats] = await Promise.all([
     prisma.site.findMany({ orderBy: [{ active: "desc" }, { name: "asc" }] }),
     prisma.attendance.findMany({
       where: {
@@ -25,7 +25,23 @@ export default async function ObrasPage() {
       },
       include: { employee: true },
     }),
+    prisma.siteTool.groupBy({
+      by: ["siteId"],
+      where: { active: true },
+      _count: { _all: true },
+      _sum: { quantity: true },
+    }),
   ]);
+
+  const toolStatsBySite = new Map(
+    toolStats.map((row) => [
+      row.siteId,
+      {
+        toolKinds: row._count._all,
+        toolUnits: Number(row._sum.quantity ?? 0),
+      },
+    ]),
+  );
 
   const weekBySite = new Map<
     number,
@@ -54,6 +70,8 @@ export default async function ObrasPage() {
           id: site.id,
           name: site.name,
           active: site.active,
+          toolKinds: toolStatsBySite.get(site.id)?.toolKinds ?? 0,
+          toolUnits: toolStatsBySite.get(site.id)?.toolUnits ?? 0,
           weekEmployees: Array.from(
             weekBySite.get(site.id)?.values() ?? [],
           ).sort((a, b) => a.name.localeCompare(b.name)),

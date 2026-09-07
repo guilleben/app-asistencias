@@ -17,8 +17,26 @@ function createPrismaClient() {
   return new PrismaClient({ adapter });
 }
 
-export const prisma = globalForPrisma.prisma ?? createPrismaClient();
+function getPrismaClient() {
+  const cached = globalForPrisma.prisma;
+  // ponytail: dev HMR keeps stale client after `prisma generate`
+  if (
+    cached &&
+    typeof cached.siteToolMovement !== "undefined" &&
+    typeof cached.siteTool !== "undefined"
+  ) {
+    return cached;
+  }
 
-if (process.env.NODE_ENV !== "production") {
+  const client = createPrismaClient();
+  if (process.env.NODE_ENV !== "production") {
+    globalForPrisma.prisma = client;
+  }
+  return client;
+}
+
+export const prisma = getPrismaClient();
+
+if (process.env.NODE_ENV === "production" && !globalForPrisma.prisma) {
   globalForPrisma.prisma = prisma;
 }

@@ -20,6 +20,7 @@ import { Label } from "@/components/ui/label";
 import {
   createDebtMovement,
   deleteDebtMovement,
+  settleEmployeeDebt,
   updateDebtMovement,
 } from "@/lib/actions/debts";
 import { formatIsoShort } from "@/lib/dates";
@@ -49,6 +50,15 @@ type EmployeeDebt = {
   movements: Movement[];
 };
 
+type ManualMovementType = "loan" | "payment" | "credit";
+
+function movementPayload(type: ManualMovementType, value: number) {
+  return {
+    amount: type === "loan" ? value : -value,
+    allowCredit: type === "credit",
+  };
+}
+
 function EmployeeBalanceBadge({ balance }: { balance: number }) {
   const formatted = formatEmployeeBalance(balance);
 
@@ -64,10 +74,13 @@ function EmployeeBalanceBadge({ balance }: { balance: number }) {
 function NewMovementDialog({ employees }: { employees: EmployeeDebt[] }) {
   const [open, setOpen] = useState(false);
   const [employeeId, setEmployeeId] = useState(employees[0]?.id ?? 0);
-  const [type, setType] = useState<"debt" | "credit">("debt");
+  const [type, setType] = useState<ManualMovementType>("loan");
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
   const [pending, startTransition] = useTransition();
+
+  const selected = employees.find((e) => e.id === employeeId);
+  const debtPending = Math.max(selected?.balance ?? 0, 0);
 
   function handleSave() {
     const value = Number(amount);
@@ -76,10 +89,23 @@ function NewMovementDialog({ employees }: { employees: EmployeeDebt[] }) {
       return;
     }
 
+    if (type === "payment" && debtPending === 0) {
+      toast.error(
+        "No hay deuda pendiente. Si ya descontaste en Pagos, no hace falta cargarlo acá.",
+      );
+      return;
+    }
+    if (type === "payment" && value > debtPending) {
+      toast.error(
+        `El monto supera la deuda pendiente (${formatARS(debtPending)}). Si ya descontaste en Pagos, no lo repitas acá.`,
+      );
+      return;
+    }
+
     startTransition(async () => {
       const result = await createDebtMovement({
         employeeId,
-        amount: type === "debt" ? value : -value,
+        ...movementPayload(type, value),
         note: note || undefined,
       });
       if (result.ok) {
@@ -121,13 +147,19 @@ function NewMovementDialog({ employees }: { employees: EmployeeDebt[] }) {
             <Label>Tipo</Label>
             <NativeSelect
               value={type}
-              onChange={(e) => setType(e.target.value as "debt" | "credit")}
+              onChange={(e) => setType(e.target.value as ManualMovementType)}
             >
-              <option value="debt">Nueva deuda (préstamo)</option>
-              <option value="credit">
-                Descuento / saldo a favor al empleado
-              </option>
+              <option value="loan">Nueva deuda (préstamo)</option>
+              <option value="payment">Pago de deuda (manual)</option>
+              <option value="credit">Saldo a favor al empleado</option>
             </NativeSelect>
+            {type === "payment" ? (
+              <p className="text-xs text-muted-foreground">
+                {debtPending > 0
+                  ? `Deuda pendiente: ${formatARS(debtPending)}. Si ya descontaste en Pagos, no lo cargues acá.`
+                  : "Sin deuda pendiente. Si ya descontaste en Pagos, no hace falta otro movimiento."}
+              </p>
+            ) : null}
           </div>
           <div className="space-y-1">
             <Label htmlFor="debt-amount">Monto</Label>
@@ -160,14 +192,23 @@ function NewMovementDialog({ employees }: { employees: EmployeeDebt[] }) {
   );
 }
 
-function EditMovementDialog({ movement }: { movement: Movement }) {
+function EditMovementDialog({
+  movement,
+  employeeBalance,
+}: {
+  movement: Movement;
+  employeeBalance: number;
+}) {
   const [open, setOpen] = useState(false);
-  const [type, setType] = useState<"debt" | "credit">(
-    movement.amount > 0 ? "debt" : "credit",
+  const [type, setType] = useState<ManualMovementType>(
+    movement.amount > 0 ? "loan" : "payment",
   );
   const [amount, setAmount] = useState(String(Math.abs(movement.amount)));
   const [note, setNote] = useState(movement.note ?? "");
   const [pending, startTransition] = useTransition();
+
+  const balanceBefore = employeeBalance - movement.amount;
+  const debtPending = Math.max(balanceBefore, 0);
 
   function handleSave() {
     const value = Number(amount);
@@ -176,10 +217,23 @@ function EditMovementDialog({ movement }: { movement: Movement }) {
       return;
     }
 
+    if (type === "payment" && debtPending === 0) {
+      toast.error(
+        "No hay deuda pendiente. Si ya descontaste en Pagos, no hace falta cargarlo acá.",
+      );
+      return;
+    }
+    if (type === "payment" && value > debtPending) {
+      toast.error(
+        `El monto supera la deuda pendiente (${formatARS(debtPending)}).`,
+      );
+      return;
+    }
+
     startTransition(async () => {
       const result = await updateDebtMovement({
         id: movement.id,
-        amount: type === "debt" ? value : -value,
+        ...movementPayload(type, value),
         note: note || undefined,
       });
       if (result.ok) {
@@ -213,10 +267,11 @@ function EditMovementDialog({ movement }: { movement: Movement }) {
             <Label>Tipo</Label>
             <NativeSelect
               value={type}
-              onChange={(e) => setType(e.target.value as "debt" | "credit")}
+              onChange={(e) => setType(e.target.value as ManualMovementType)}
             >
-              <option value="debt">Deuda (préstamo)</option>
-              <option value="credit">Descuento / saldo a favor</option>
+              <option value="loan">Deuda (préstamo)</option>
+              <option value="payment">Pago de deuda (manual)</option>
+              <option value="credit">Saldo a favor al empleado</option>
             </NativeSelect>
           </div>
           <div className="space-y-1">
@@ -250,9 +305,72 @@ function EditMovementDialog({ movement }: { movement: Movement }) {
   );
 }
 
-function MovementRow({ movement }: { movement: Movement }) {
+function SettleDebtDialog({ employee }: { employee: EmployeeDebt }) {
+  const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
-  const kind = getDebtMovementKind(movement.amount, movement.fromPayment);
+
+  if (employee.balance === 0) return null;
+
+  const formatted = formatEmployeeBalance(employee.balance);
+
+  function handleConfirm() {
+    startTransition(async () => {
+      const result = await settleEmployeeDebt(employee.id);
+      if (result.ok) {
+        toast.success(result.message);
+        setOpen(false);
+      } else {
+        toast.error(result.message);
+      }
+    });
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger render={<Button size="sm" variant="outline" />}>
+        Poner al día
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Poner al día — {employee.name}</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground">
+          Saldo actual:{" "}
+          <span className="font-medium text-foreground">{formatted.text}</span>
+        </p>
+        <p className="text-sm text-muted-foreground">
+          Se registrará un ajuste de {formatARS(Math.abs(employee.balance))} y
+          el saldo quedará en cero.
+        </p>
+        {employee.balance > 0 ? (
+          <p className="text-sm text-destructive">
+            Si ya descontaste esta deuda en Pagos, no confirmes: el saldo ya
+            debería estar en cero.
+          </p>
+        ) : null}
+        <DialogFooter>
+          <Button disabled={pending} onClick={handleConfirm}>
+            {pending ? "Guardando..." : "Confirmar"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function MovementRow({
+  movement,
+  employeeBalance,
+}: {
+  movement: Movement;
+  employeeBalance: number;
+}) {
+  const [pending, startTransition] = useTransition();
+  const kind = getDebtMovementKind(
+    movement.amount,
+    movement.fromPayment,
+    movement.note,
+  );
   const balanceLabel = formatBalanceAfterLabel(movement.balanceAfter);
 
   function handleDelete() {
@@ -274,7 +392,7 @@ function MovementRow({ movement }: { movement: Movement }) {
             variant={
               kind === "loan"
                 ? "destructive"
-                : kind === "credit_applied"
+                : kind === "credit_applied" || kind === "settlement"
                   ? "success"
                   : "success"
             }
@@ -284,14 +402,12 @@ function MovementRow({ movement }: { movement: Movement }) {
           <p
             className={cn(
               "font-semibold",
-              kind === "loan" || kind === "credit_applied"
-                ? kind === "loan"
-                  ? "text-destructive"
-                  : "text-[#248a3d]"
+              kind === "loan"
+                ? "text-destructive"
                 : "text-[#248a3d]",
             )}
           >
-            {kind === "loan" || kind === "credit_applied" ? "+" : ""}
+            {movement.amount > 0 ? "+" : ""}
             {formatARS(Math.abs(movement.amount))}
           </p>
         </div>
@@ -315,7 +431,10 @@ function MovementRow({ movement }: { movement: Movement }) {
       </div>
       {!movement.fromPayment && (
         <div className="flex shrink-0 items-center gap-1">
-          <EditMovementDialog movement={movement} />
+          <EditMovementDialog
+            movement={movement}
+            employeeBalance={employeeBalance}
+          />
           <Button
             variant="ghost"
             size="icon-xs"
@@ -367,13 +486,22 @@ export function DebtManager({ employees }: { employees: EmployeeDebt[] }) {
               <EmployeeBalanceBadge balance={employee.balance} />
             </summary>
             <div className="divide-y border-t px-4 pb-2">
+              {employee.balance !== 0 ? (
+                <div className="flex justify-end py-3">
+                  <SettleDebtDialog employee={employee} />
+                </div>
+              ) : null}
               {employee.movements.length === 0 ? (
                 <p className="py-3 text-xs text-muted-foreground">
                   Sin movimientos.
                 </p>
               ) : (
                 employee.movements.map((movement) => (
-                  <MovementRow key={movement.id} movement={movement} />
+                  <MovementRow
+                    key={movement.id}
+                    movement={movement}
+                    employeeBalance={employee.balance}
+                  />
                 ))
               )}
             </div>

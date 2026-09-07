@@ -4,11 +4,29 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { fail, ok, type ActionResult } from "@/lib/actions/result";
+import {
+  inheritSiteId,
+  inheritSiteIdsForEmployees,
+  type AttendanceShift,
+} from "@/lib/attendance";
 import { isoToDb } from "@/lib/dates";
 import { prisma } from "@/lib/db";
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const shiftSchema = z.enum(["MORNING", "AFTERNOON"]);
+
+async function resolveSiteId(
+  employeeId: number,
+  date: string,
+  shift: AttendanceShift,
+  present: boolean,
+  siteId: number | null | undefined,
+): Promise<number | null> {
+  if (!present) return siteId ?? null;
+  if (siteId !== undefined && siteId !== null) return siteId;
+  if (siteId === null) return null;
+  return inheritSiteId(employeeId, date, shift);
+}
 
 const setAttendanceSchema = z.object({
   employeeId: z.number().int().positive(),
@@ -27,17 +45,28 @@ export async function setAttendance(
   const { employeeId, date, shift, present, siteId } = parsed.data;
 
   try {
+    const resolvedSiteId = await resolveSiteId(
+      employeeId,
+      date,
+      shift,
+      present,
+      siteId,
+    );
+
     await prisma.attendance.upsert({
       where: {
         employeeId_date_shift: { employeeId, date: isoToDb(date), shift },
       },
-      update: { present, ...(siteId !== undefined && { siteId }) },
+      update: {
+        present,
+        ...(present && { siteId: resolvedSiteId }),
+      },
       create: {
         employeeId,
         date: isoToDb(date),
         shift,
         present,
-        siteId: siteId ?? null,
+        siteId: resolvedSiteId,
       },
     });
 
@@ -106,11 +135,22 @@ export async function markAllPresent(
       where: { active: true },
       select: { id: true },
     });
+    const employeeIds = employees.map((e) => e.id);
+    const inherited =
+      present && siteId === undefined
+        ? await inheritSiteIdsForEmployees(employeeIds, date, shifts)
+        : new Map<string, number | null>();
 
     await prisma.$transaction(
       employees.flatMap((employee) =>
-        shifts.map((s) =>
-          prisma.attendance.upsert({
+        shifts.map((s) => {
+          const resolvedSiteId = present
+            ? (siteId ??
+              inherited.get(`${employee.id}|${s}`) ??
+              null)
+            : (siteId ?? null);
+
+          return prisma.attendance.upsert({
             where: {
               employeeId_date_shift: {
                 employeeId: employee.id,
@@ -120,17 +160,17 @@ export async function markAllPresent(
             },
             update: {
               present,
-              ...(siteId !== undefined && { siteId }),
+              ...(present && { siteId: resolvedSiteId }),
             },
             create: {
               employeeId: employee.id,
               date: isoToDb(date),
               shift: s,
               present,
-              siteId: siteId ?? null,
+              siteId: resolvedSiteId,
             },
-          }),
-        ),
+          });
+        }),
       ),
     );
 

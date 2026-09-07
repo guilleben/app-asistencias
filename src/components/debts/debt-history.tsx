@@ -37,13 +37,13 @@ type FilterTab = (typeof FILTER_TABS)[number]["value"];
 
 function kindBadgeVariant(kind: DebtMovementKind) {
   if (kind === "loan") return "destructive" as const;
-  if (kind === "credit_applied") return "success" as const;
+  if (kind === "credit_applied" || kind === "settlement") return "success" as const;
   if (kind === "payment" || kind === "manual_discount") return "success" as const;
   return "secondary" as const;
 }
 
 function HistoryRow({ item }: { item: DebtHistoryItem }) {
-  const kind = getDebtMovementKind(item.amount, item.fromPayment);
+  const kind = getDebtMovementKind(item.amount, item.fromPayment, item.note);
   const dateLabel = new Date(item.date).toLocaleDateString("es-AR", {
     day: "2-digit",
     month: "2-digit",
@@ -60,7 +60,7 @@ function HistoryRow({ item }: { item: DebtHistoryItem }) {
             : "bg-success/10 text-[#248a3d]",
         )}
       >
-        {kind === "loan" || kind === "credit_applied" ? "+" : "−"}
+        {item.amount > 0 ? "+" : "−"}
       </div>
       <div className="min-w-0 flex-1 space-y-1">
         <div className="flex flex-wrap items-center gap-2">
@@ -70,12 +70,10 @@ function HistoryRow({ item }: { item: DebtHistoryItem }) {
         <p
           className={cn(
             "text-[17px] font-semibold tabular-nums tracking-tight",
-            kind === "loan" || kind === "credit_applied"
-              ? "text-destructive"
-              : "text-[#248a3d]",
+            kind === "loan" ? "text-destructive" : "text-[#248a3d]",
           )}
         >
-          {kind === "loan" || kind === "credit_applied" ? "+" : ""}
+          {item.amount > 0 ? "+" : ""}
           {formatARS(Math.abs(item.amount))}
         </p>
         <p className="text-[13px] text-muted-foreground">
@@ -114,7 +112,11 @@ export function DebtHistory({
     return items.filter((item) => {
       if (employeeId !== "all" && item.employeeId !== employeeId) return false;
       if (filter === "all") return true;
-      return getDebtMovementKind(item.amount, item.fromPayment) === filter;
+      const kind = getDebtMovementKind(item.amount, item.fromPayment, item.note);
+      if (filter === "payment") {
+        return kind === "payment" || kind === "manual_discount" || kind === "settlement";
+      }
+      return kind === filter;
     });
   }, [items, employeeId, filter]);
 
@@ -122,7 +124,7 @@ export function DebtHistory({
     let loans = 0;
     let payments = 0;
     for (const item of filtered) {
-      const kind = getDebtMovementKind(item.amount, item.fromPayment);
+      const kind = getDebtMovementKind(item.amount, item.fromPayment, item.note);
       if (kind === "loan") loans += item.amount;
       else payments += Math.abs(item.amount);
     }

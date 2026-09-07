@@ -72,11 +72,13 @@ export function AttendanceGrid({
   employees,
   sites,
   records,
+  siteDefaults,
 }: {
   weekStart: string;
   employees: EmployeeItem[];
   sites: SiteItem[];
   records: RecordItem[];
+  siteDefaults: Record<string, number | null>;
 }) {
   const days = useMemo(() => weekDaysIso(weekStart), [weekStart]);
   const today = todayIso();
@@ -116,7 +118,7 @@ export function AttendanceGrid({
     return (
       cells.get(cellKey(employeeId, date, shift)) ?? {
         present: false,
-        siteId: null,
+        siteId: siteDefaults[cellKey(employeeId, date, shift)] ?? null,
         recordedAt: null,
       }
     );
@@ -207,7 +209,10 @@ export function AttendanceGrid({
           const current = next.get(key);
           next.set(key, {
             present: nextPresent,
-            siteId: current?.siteId ?? null,
+            siteId:
+              current?.siteId ??
+              siteDefaults[key] ??
+              null,
             recordedAt: nextPresent
               ? (current?.recordedAt ?? new Date().toISOString())
               : null,
@@ -305,7 +310,7 @@ export function AttendanceGrid({
                           </p>
                         ) : null}
                       </div>
-                      {cell.present && (
+                      {(cell.present || cell.siteId !== null) && (
                         <NativeSelect
                           className="w-32 shrink-0"
                           value={cell.siteId ?? ""}
