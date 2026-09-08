@@ -34,9 +34,11 @@ import {
   updateSiteTool,
 } from "@/lib/actions/tools";
 import {
-  TOOL_MOVEMENT_LABELS,
   TOOL_STATUS_LABELS,
+  toolMovementLabel,
   toolStatusBadgeVariant,
+  toolStatusLabel,
+  normalizeToolStatus,
   type ToolStatusValue,
 } from "@/lib/tools";
 
@@ -63,7 +65,7 @@ type SearchToolItem = ToolItem & {
 type MovementItem = {
   id: number;
   toolName: string;
-  kind: keyof typeof TOOL_MOVEMENT_LABELS;
+  kind: string;
   quantity: number;
   quantityAfter: number | null;
   status: ToolStatusValue | null;
@@ -174,8 +176,10 @@ function NewToolDialog({ siteId }: { siteId: number }) {
   const [note, setNote] = useState("");
   const [pending, startTransition] = useTransition();
 
+  if (siteId <= 0) return null;
+
   function handleSave() {
-    const qty = Number(quantity);
+    const qty = Math.floor(Number(quantity));
     if (!name.trim()) {
       toast.error("Ingresá el nombre de la herramienta");
       return;
@@ -243,12 +247,12 @@ function EditToolDialog({ tool }: { tool: ToolItem }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(tool.name);
   const [quantity, setQuantity] = useState(String(tool.quantity));
-  const [status, setStatus] = useState(tool.status);
+  const [status, setStatus] = useState(normalizeToolStatus(tool.status));
   const [note, setNote] = useState(tool.note ?? "");
   const [pending, startTransition] = useTransition();
 
   function handleSave() {
-    const qty = Number(quantity);
+    const qty = Math.floor(Number(quantity));
     if (!name.trim() || !qty || qty <= 0) {
       toast.error("Completá nombre y cantidad válidos");
       return;
@@ -327,7 +331,7 @@ function TransferToolDialog({
   const destinations = sites.filter((s) => s.id !== fromSiteId);
 
   function handleSave() {
-    const qty = Number(quantity);
+    const qty = Math.floor(Number(quantity));
     if (!toSiteId) {
       toast.error("Elegí la obra destino");
       return;
@@ -436,7 +440,7 @@ function ToolRow({
         <div className="flex flex-wrap items-center gap-2">
           <p className="font-medium">{tool.name}</p>
           <Badge variant={toolStatusBadgeVariant(tool.status)}>
-            {TOOL_STATUS_LABELS[tool.status]}
+            {toolStatusLabel(tool.status)}
           </Badge>
         </div>
         {tool.note ? (
@@ -515,7 +519,11 @@ function SiteToolsPanel({
       </div>
 
       <div className="surface divide-y px-4">
-        {tools.length === 0 ? (
+        {selectedSiteId <= 0 ? (
+          <p className="py-6 text-center text-sm text-muted-foreground">
+            Elegí una obra para ver herramientas.
+          </p>
+        ) : tools.length === 0 ? (
           <p className="py-6 text-center text-sm text-muted-foreground">
             No hay herramientas en esta obra.
           </p>
@@ -652,7 +660,7 @@ function HistoryPanel({ movements }: { movements: MovementItem[] }) {
           <div key={m.id} className="space-y-1 px-4 py-3 text-sm">
             <div className="flex flex-wrap items-center gap-2">
               <p className="font-medium">{m.toolName}</p>
-              <Badge variant="outline">{TOOL_MOVEMENT_LABELS[m.kind]}</Badge>
+              <Badge variant="outline">{toolMovementLabel(m.kind)}</Badge>
               <span className="text-muted-foreground">×{m.quantity}</span>
             </div>
             <p className="text-xs text-muted-foreground">

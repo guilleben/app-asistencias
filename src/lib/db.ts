@@ -19,7 +19,7 @@ function createPrismaClient() {
 
 function getPrismaClient() {
   const cached = globalForPrisma.prisma;
-  // ponytail: dev HMR keeps stale client after `prisma generate`
+  // ponytail: warm serverless instances keep stale client after deploy/generate
   if (
     cached &&
     typeof cached.siteToolMovement !== "undefined" &&
@@ -29,14 +29,8 @@ function getPrismaClient() {
   }
 
   const client = createPrismaClient();
-  if (process.env.NODE_ENV !== "production") {
-    globalForPrisma.prisma = client;
-  }
+  globalForPrisma.prisma = client;
   return client;
 }
 
 export const prisma = getPrismaClient();
-
-if (process.env.NODE_ENV === "production" && !globalForPrisma.prisma) {
-  globalForPrisma.prisma = prisma;
-}

@@ -84,7 +84,8 @@ export async function createSiteTool(
 
     revalidatePath("/", "layout");
     return ok("Herramienta cargada");
-  } catch {
+  } catch (error) {
+    console.error("createSiteTool", error);
     return fail("No se pudo cargar (¿ya existe en esta obra?)");
   }
 }

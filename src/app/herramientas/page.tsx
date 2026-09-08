@@ -1,5 +1,6 @@
 import { ToolManager } from "@/components/tools/tool-manager";
 import { PageHeader } from "@/components/page-header";
+import { normalizeToolStatus } from "@/lib/tools";
 import { prisma } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -78,7 +79,7 @@ export default async function HerramientasPage({
           id: t.id,
           name: t.name,
           quantity: t.quantity,
-          status: t.status,
+          status: normalizeToolStatus(t.status),
           note: t.note,
         }))}
         allTools={allTools.map((t) => ({
@@ -87,7 +88,7 @@ export default async function HerramientasPage({
           siteName: t.site.name,
           name: t.name,
           quantity: t.quantity,
-          status: t.status,
+          status: normalizeToolStatus(t.status),
           note: t.note,
         }))}
         movements={movements.map((m) => ({

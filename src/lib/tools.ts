@@ -17,10 +17,30 @@ export const TOOL_MOVEMENT_LABELS: Record<ToolMovementKind, string> = {
 
 export type ToolStatusValue = ToolStatus;
 
+export function normalizeToolStatus(
+  status: string | null | undefined,
+): ToolStatus {
+  if (status === "OK" || status === "IN_REPAIR" || status === "LOST") {
+    return status;
+  }
+  return "OK";
+}
+
+export function toolStatusLabel(status: string | null | undefined): string {
+  return TOOL_STATUS_LABELS[normalizeToolStatus(status)];
+}
+
+export function toolMovementLabel(kind: string): string {
+  return (
+    TOOL_MOVEMENT_LABELS[kind as ToolMovementKind] ?? kind.replaceAll("_", " ")
+  );
+}
+
 export function toolStatusBadgeVariant(
-  status: ToolStatus,
+  status: string | null | undefined,
 ): "success" | "secondary" | "destructive" {
-  if (status === "OK") return "success";
-  if (status === "IN_REPAIR") return "secondary";
+  const normalized = normalizeToolStatus(status);
+  if (normalized === "OK") return "success";
+  if (normalized === "IN_REPAIR") return "secondary";
   return "destructive";
 }
