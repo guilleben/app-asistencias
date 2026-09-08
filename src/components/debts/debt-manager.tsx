@@ -28,6 +28,7 @@ import {
   DEBT_MOVEMENT_LABELS,
   formatBalanceAfterLabel,
   formatEmployeeBalance,
+  formatMovementAmount,
   getDebtMovementKind,
 } from "@/lib/debts";
 import { formatARS } from "@/lib/format";
@@ -361,9 +362,11 @@ function SettleDebtDialog({ employee }: { employee: EmployeeDebt }) {
 function MovementRow({
   movement,
   employeeBalance,
+  isLatestMovement,
 }: {
   movement: Movement;
   employeeBalance: number;
+  isLatestMovement: boolean;
 }) {
   const [pending, startTransition] = useTransition();
   const kind = getDebtMovementKind(
@@ -371,7 +374,12 @@ function MovementRow({
     movement.fromPayment,
     movement.note,
   );
-  const balanceLabel = formatBalanceAfterLabel(movement.balanceAfter);
+  const balanceLabel = formatBalanceAfterLabel(
+    movement.balanceAfter,
+    employeeBalance,
+    isLatestMovement,
+  );
+  const amountDisplay = formatMovementAmount(movement.amount, kind);
 
   function handleDelete() {
     startTransition(async () => {
@@ -402,13 +410,15 @@ function MovementRow({
           <p
             className={cn(
               "font-semibold",
-              kind === "loan"
+              amountDisplay.tone === "debt"
                 ? "text-destructive"
-                : "text-[#248a3d]",
+                : amountDisplay.tone === "credit"
+                  ? "text-[#248a3d]"
+                  : "text-foreground",
             )}
           >
-            {movement.amount > 0 ? "+" : ""}
-            {formatARS(Math.abs(movement.amount))}
+            {amountDisplay.prefix}
+            {amountDisplay.value}
           </p>
         </div>
         <p className="text-xs text-muted-foreground">
@@ -496,11 +506,12 @@ export function DebtManager({ employees }: { employees: EmployeeDebt[] }) {
                   Sin movimientos.
                 </p>
               ) : (
-                employee.movements.map((movement) => (
+                employee.movements.map((movement, index) => (
                   <MovementRow
                     key={movement.id}
                     movement={movement}
                     employeeBalance={employee.balance}
+                    isLatestMovement={index === 0}
                   />
                 ))
               )}

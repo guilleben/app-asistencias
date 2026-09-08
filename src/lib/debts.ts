@@ -42,14 +42,23 @@ export function formatEmployeeBalance(balance: number): {
   return { text: "Al día", tone: "ok" };
 }
 
-export function formatBalanceAfterLabel(balanceAfter: number): string | null {
+export function formatBalanceAfterLabel(
+  balanceAfter: number,
+  currentBalance: number,
+  isLatestMovement: boolean,
+): string | null {
+  if (balanceAfter === 0) return null;
+  // ponytail: hide stale snapshots so "Al día" arriba no contradice deuda histórica abajo
+  if (!isLatestMovement && balanceAfter !== currentBalance) return null;
+
   if (balanceAfter > 0) {
-    return `Sigue debiendo ${formatARS(balanceAfter)}`;
+    return isLatestMovement && balanceAfter === currentBalance
+      ? `Debe ${formatARS(balanceAfter)}`
+      : `Sigue debiendo ${formatARS(balanceAfter)}`;
   }
-  if (balanceAfter < 0) {
-    return `Saldo a favor ${formatARS(Math.abs(balanceAfter))}`;
-  }
-  return null;
+  return isLatestMovement && balanceAfter === currentBalance
+    ? `${formatARS(Math.abs(balanceAfter))} a favor`
+    : `Saldo a favor ${formatARS(Math.abs(balanceAfter))}`;
 }
 
 type BalanceMovement = { id: number; amount: number; date: string };
@@ -70,6 +79,24 @@ export function validateManualDebtReduction(
     return `El monto supera la deuda pendiente (${formatARS(debtPending)}). Si ya descontaste en Pagos, no lo repitas acá.`;
   }
   return null;
+}
+
+export function formatMovementAmount(
+  amount: number,
+  kind: DebtMovementKind,
+): { prefix: string; value: string; tone: "debt" | "credit" | "neutral" } {
+  if (kind === "settlement") {
+    return {
+      prefix: "Ajuste ",
+      value: formatARS(Math.abs(amount)),
+      tone: "neutral",
+    };
+  }
+  return {
+    prefix: amount > 0 ? "+" : "",
+    value: formatARS(Math.abs(amount)),
+    tone: amount > 0 ? "debt" : "credit",
+  };
 }
 
 export function computeBalanceAfterById(

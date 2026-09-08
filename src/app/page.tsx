@@ -80,7 +80,7 @@ export default async function HomePage() {
       sub: `${paidThisWeek._count._all} de ${activeEmployees}`,
     },
     {
-      label: "Deuda total de secretarios",
+      label: "Deuda total",
       value: formatARS(Number(debtTotal._sum.amount ?? 0)),
       accent: true,
     },

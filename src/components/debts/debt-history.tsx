@@ -9,6 +9,7 @@ import { formatIsoShort } from "@/lib/dates";
 import {
   DEBT_MOVEMENT_LABELS,
   formatBalanceAfterLabel,
+  formatMovementAmount,
   getDebtMovementKind,
   type DebtMovementKind,
 } from "@/lib/debts";
@@ -42,13 +43,27 @@ function kindBadgeVariant(kind: DebtMovementKind) {
   return "secondary" as const;
 }
 
-function HistoryRow({ item }: { item: DebtHistoryItem }) {
+function HistoryRow({
+  item,
+  currentBalance,
+  isLatestMovement,
+}: {
+  item: DebtHistoryItem;
+  currentBalance: number;
+  isLatestMovement: boolean;
+}) {
   const kind = getDebtMovementKind(item.amount, item.fromPayment, item.note);
+  const amountDisplay = formatMovementAmount(item.amount, kind);
   const dateLabel = new Date(item.date).toLocaleDateString("es-AR", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
   });
+  const balanceLabel = formatBalanceAfterLabel(
+    item.balanceAfter,
+    currentBalance,
+    isLatestMovement,
+  );
 
   return (
     <div className="flex items-start gap-3 px-4 py-3">
@@ -70,11 +85,15 @@ function HistoryRow({ item }: { item: DebtHistoryItem }) {
         <p
           className={cn(
             "text-[17px] font-semibold tabular-nums tracking-tight",
-            kind === "loan" ? "text-destructive" : "text-[#248a3d]",
+            amountDisplay.tone === "debt"
+              ? "text-destructive"
+              : amountDisplay.tone === "credit"
+                ? "text-[#248a3d]"
+                : "text-foreground",
           )}
         >
-          {item.amount > 0 ? "+" : ""}
-          {formatARS(Math.abs(item.amount))}
+          {amountDisplay.prefix}
+          {amountDisplay.value}
         </p>
         <p className="text-[13px] text-muted-foreground">
           {dateLabel}
@@ -83,14 +102,14 @@ function HistoryRow({ item }: { item: DebtHistoryItem }) {
             : ""}
           {item.note ? ` · ${item.note}` : ""}
         </p>
-        {formatBalanceAfterLabel(item.balanceAfter) ? (
+        {balanceLabel ? (
           <p
             className={cn(
               "text-[13px] font-semibold",
               item.balanceAfter > 0 ? "text-destructive" : "text-[#248a3d]",
             )}
           >
-            {formatBalanceAfterLabel(item.balanceAfter)}
+            {balanceLabel}
           </p>
         ) : null}
       </div>
@@ -103,10 +122,25 @@ export function DebtHistory({
   employees,
 }: {
   items: DebtHistoryItem[];
-  employees: { id: number; name: string }[];
+  employees: { id: number; name: string; balance?: number }[];
 }) {
   const [employeeId, setEmployeeId] = useState<number | "all">("all");
   const [filter, setFilter] = useState<FilterTab>("all");
+
+  const balanceByEmployee = useMemo(
+    () => new Map(employees.map((employee) => [employee.id, employee.balance ?? 0])),
+    [employees],
+  );
+
+  const latestMovementIdByEmployee = useMemo(() => {
+    const latest = new Map<number, number>();
+    for (const item of items) {
+      if (!latest.has(item.employeeId)) {
+        latest.set(item.employeeId, item.id);
+      }
+    }
+    return latest;
+  }, [items]);
 
   const filtered = useMemo(() => {
     return items.filter((item) => {
@@ -193,7 +227,14 @@ export function DebtHistory({
               ) : (
                 <div className="divide-y divide-border/60">
                   {filtered.map((item) => (
-                    <HistoryRow key={item.id} item={item} />
+                    <HistoryRow
+                      key={item.id}
+                      item={item}
+                      currentBalance={balanceByEmployee.get(item.employeeId) ?? 0}
+                      isLatestMovement={
+                        latestMovementIdByEmployee.get(item.employeeId) === item.id
+                      }
+                    />
                   ))}
                 </div>
               )}

@@ -64,7 +64,11 @@ export default async function DeudasPage() {
       <DebtManager employees={employeeRows} />
       <DebtHistory
         items={history}
-        employees={employeeRows.map(({ id, name }) => ({ id, name }))}
+        employees={employeeRows.map(({ id, name, balance }) => ({
+          id,
+          name,
+          balance,
+        }))}
       />
     </div>
   );
