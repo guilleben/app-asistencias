@@ -1,6 +1,7 @@
 import { renderToBuffer } from "@react-pdf/renderer";
 import { NextResponse } from "next/server";
 
+import { attachmentDisposition } from "@/lib/content-disposition";
 import { prisma } from "@/lib/db";
 import { PresupuestoDocument } from "@/lib/pdf/presupuesto-document";
 import { registerPdfFonts } from "@/lib/pdf/register-fonts";
@@ -59,7 +60,7 @@ export async function GET(_request: Request, context: RouteContext) {
   return new NextResponse(new Uint8Array(buffer), {
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="${filename}"`,
+      "Content-Disposition": attachmentDisposition(filename),
     },
   });
 }

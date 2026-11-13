@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   createMaterialList,
   deleteMaterialList,
@@ -72,26 +73,57 @@ function formFromListado(listado: ListadoMaterialesItem): FormState {
   };
 }
 
-function formToInput(form: FormState): MaterialListInput | null {
-  const items = form.items
-    .map((item) => ({
-      description: item.description.trim(),
-      quantity: item.quantity.trim(),
-    }))
-    .filter((item) => item.description && item.quantity);
+function formToInput(
+  form: FormState,
+): { ok: true; input: MaterialListInput } | { ok: false; message: string } {
+  if (
+    !form.owner.trim() ||
+    !form.workName.trim() ||
+    !form.location.trim() ||
+    !form.date
+  ) {
+    return {
+      ok: false,
+      message: "Completá propietario, obra, ubicación y fecha",
+    };
+  }
 
-  if (!form.owner.trim()) return null;
-  if (!form.workName.trim()) return null;
-  if (!form.location.trim()) return null;
-  if (!form.date) return null;
-  if (items.length === 0) return null;
+  const trimmed = form.items.map((item) => ({
+    description: item.description.trim(),
+    quantity: item.quantity.trim(),
+  }));
+
+  const incompleteRow = trimmed.findIndex(
+    (item) => Boolean(item.description) !== Boolean(item.quantity),
+  );
+  if (incompleteRow !== -1) {
+    const missing = trimmed[incompleteRow].description
+      ? "la cantidad"
+      : "la descripción";
+    return {
+      ok: false,
+      message: `Falta ${missing} en el ítem ${incompleteRow + 1}`,
+    };
+  }
+
+  // Fully empty rows are ignored.
+  const items = trimmed.filter((item) => item.description && item.quantity);
+  if (items.length === 0) {
+    return {
+      ok: false,
+      message: "Agregá al menos un ítem con descripción y cantidad",
+    };
+  }
 
   return {
-    owner: form.owner.trim(),
-    workName: form.workName.trim(),
-    location: form.location.trim(),
-    date: form.date,
-    items,
+    ok: true,
+    input: {
+      owner: form.owner.trim(),
+      workName: form.workName.trim(),
+      location: form.location.trim(),
+      date: form.date,
+      items,
+    },
   };
 }
 
@@ -179,52 +211,63 @@ function ListadoFormFields({
 
       <div className="space-y-2">
         <Label>Ítems</Label>
-        <div className="grid grid-cols-[2rem_1fr_5rem_auto] gap-2 text-xs font-medium text-muted-foreground">
-          <span>#</span>
-          <span>Descripción</span>
-          <span>Cant.</span>
-          <span className="w-16" />
-        </div>
         {form.items.map((item, index) => (
           <div
             key={index}
-            className="grid grid-cols-[2rem_1fr_5rem_auto] items-center gap-2"
+            className="space-y-2 rounded-xl bg-muted/40 p-3 ring-1 ring-foreground/5"
           >
-            <span className="text-center text-sm text-muted-foreground">
-              {index + 1}
-            </span>
-            <Input
-              value={item.description}
-              maxLength={500}
-              placeholder={`Ítem ${index + 1}`}
-              onChange={(e) => updateItem(index, "description", e.target.value)}
-            />
-            <Input
-              value={item.quantity}
-              maxLength={50}
-              placeholder="Cant."
-              onChange={(e) => updateItem(index, "quantity", e.target.value)}
-            />
-            <div className="flex gap-1">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                aria-label="Agregar ítem"
-                onClick={() => addItem(index)}
-              >
-                <Plus />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                aria-label="Quitar ítem"
-                disabled={form.items.length <= 1}
-                onClick={() => removeItem(index)}
-              >
-                <Minus />
-              </Button>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-medium text-muted-foreground">
+                Ítem {index + 1}
+              </span>
+              <div className="flex shrink-0 gap-1">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={`Agregar ítem debajo del ${index + 1}`}
+                  onClick={() => addItem(index)}
+                >
+                  <Plus />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={`Quitar ítem ${index + 1}`}
+                  disabled={form.items.length <= 1}
+                  onClick={() => removeItem(index)}
+                >
+                  <Minus />
+                </Button>
+              </div>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-[1fr_8rem] sm:items-start">
+              <Textarea
+                autoGrow
+                rows={2}
+                value={item.description}
+                maxLength={500}
+                placeholder="Descripción del material"
+                aria-label={`Descripción del ítem ${index + 1}`}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") e.preventDefault();
+                }}
+                onChange={(e) =>
+                  updateItem(
+                    index,
+                    "description",
+                    e.target.value.replace(/[\r\n]+/g, " "),
+                  )
+                }
+              />
+              <Input
+                value={item.quantity}
+                maxLength={50}
+                placeholder="Cantidad"
+                aria-label={`Cantidad del ítem ${index + 1}`}
+                onChange={(e) => updateItem(index, "quantity", e.target.value)}
+              />
             </div>
           </div>
         ))}
@@ -255,13 +298,12 @@ function ListadoFormDialog({
   }
 
   function handleSave() {
-    const input = formToInput(form);
-    if (!input) {
-      toast.error(
-        "Completá todos los campos obligatorios y al menos un ítem con cantidad",
-      );
+    const parsed = formToInput(form);
+    if (!parsed.ok) {
+      toast.error(parsed.message);
       return;
     }
+    const { input } = parsed;
 
     startTransition(async () => {
       const result = isEdit
@@ -281,7 +323,7 @@ function ListadoFormDialog({
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger render={trigger} />
-      <DialogContent className="max-h-[90dvh] overflow-y-auto">
+      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>
             {isEdit ? "Editar listado" : "Nuevo listado"}

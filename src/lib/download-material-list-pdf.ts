@@ -7,12 +7,6 @@ export type MaterialListPdfMeta = {
   workName: string;
 };
 
-function parseFilenameFromDisposition(header: string | null): string | null {
-  if (!header) return null;
-  const match = header.match(/filename="([^"]+)"/);
-  return match?.[1] ?? null;
-}
-
 function isoToUtcDate(iso: string): Date {
   const [year, month, day] = iso.split("-").map(Number);
   return new Date(Date.UTC(year, month - 1, day));
@@ -84,9 +78,7 @@ export async function downloadOrShareMaterialListPdf(
   }
 
   const blob = await response.blob();
-  const filename =
-    parseFilenameFromDisposition(response.headers.get("Content-Disposition")) ??
-    buildFilename(meta);
+  const filename = buildFilename(meta);
   const file = new File([blob], filename, { type: "application/pdf" });
 
   try {
