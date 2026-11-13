@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   createBudget,
   deleteBudget,
@@ -183,32 +184,50 @@ function BudgetFormFields({
       <div className="space-y-2">
         <Label>Detalle</Label>
         {form.items.map((item, index) => (
-          <div key={index} className="flex items-start gap-2">
-            <Input
+          <div
+            key={index}
+            className="space-y-2 rounded-xl bg-muted/40 p-3 ring-1 ring-foreground/5"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-medium text-muted-foreground">
+                Ítem {index + 1}
+              </span>
+              <div className="flex shrink-0 gap-1">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={`Agregar ítem debajo del ${index + 1}`}
+                  onClick={() => addItem(index)}
+                >
+                  <Plus />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={`Quitar ítem ${index + 1}`}
+                  disabled={form.items.length <= 1}
+                  onClick={() => removeItem(index)}
+                >
+                  <Minus />
+                </Button>
+              </div>
+            </div>
+            <Textarea
+              autoGrow
+              rows={2}
               value={item.description}
               maxLength={500}
-              placeholder={`Ítem ${index + 1}`}
-              onChange={(e) => updateItem(index, e.target.value)}
+              placeholder="Descripción del ítem"
+              aria-label={`Descripción del ítem ${index + 1}`}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.preventDefault();
+              }}
+              onChange={(e) =>
+                updateItem(index, e.target.value.replace(/[\r\n]+/g, " "))
+              }
             />
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Agregar ítem"
-              onClick={() => addItem(index)}
-            >
-              <Plus />
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              aria-label="Quitar ítem"
-              disabled={form.items.length <= 1}
-              onClick={() => removeItem(index)}
-            >
-              <Minus />
-            </Button>
           </div>
         ))}
       </div>
@@ -296,7 +315,7 @@ function BudgetFormDialog({
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger render={trigger} />
-      <DialogContent className="max-h-[90dvh] overflow-y-auto">
+      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>
             {isEdit ? "Editar presupuesto" : "Nuevo presupuesto"}
